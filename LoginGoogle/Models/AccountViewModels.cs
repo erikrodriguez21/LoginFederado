@@ -8,6 +8,15 @@ namespace LoginGoogle.Models
         [Required]
         [Display(Name = "Correo electrónico")]
         public string Email { get; set; }
+        [Required]
+        [Display(Name = "Nombre")]
+        public string Nombre { get; set; }
+        [Required]
+        [Display(Name = "Apellido paterno")]  
+        public string ApellidoPaterno { get; set; }
+        [Required]
+        [Display(Name = "Apellido materno")] 
+        public string ApellidoMaterno { get; set; }
     }
 
     public class ExternalLoginListViewModel

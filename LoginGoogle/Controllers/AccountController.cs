@@ -423,9 +423,9 @@ namespace LoginGoogle.Controllers
             base.Dispose(disposing);
         }
 
-        #region Aplicaciones auxiliares
-        // Se usa para la protección XSRF al agregar inicios de sesión externos
+        #region Aplicaciones auxiliares // Se usa para la protección XSRF al agregar inicios de sesión externos
         private const string XsrfKey = "XsrfId";
+       
 
         private IAuthenticationManager AuthenticationManager
         {

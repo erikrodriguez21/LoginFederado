@@ -6,6 +6,7 @@ using Microsoft.Owin.Security.Cookies;
 using Microsoft.Owin.Security.Google;
 using Owin;
 using LoginGoogle.Models;
+using Microsoft.Owin.Security.OpenIdConnect;
 
 namespace LoginGoogle
 {
@@ -50,13 +51,32 @@ namespace LoginGoogle
             //    clientId: "",
             //    clientSecret: "");
 
+            app.UseOpenIdConnectAuthentication(new OpenIdConnectAuthenticationOptions{
+                ClientId = "mvc.owin",
+                Authority = "http://localhost:5000",
+                RedirectUri = "http://localhost:5001/",
+                Scope = "openid profile api1",
+
+                SignInAsAuthenticationType = "cookie",
+
+                RequireHttpsMetadata = false,
+                UseTokenLifetime = false,
+
+                RedeemCode = true,
+                SaveTokens = true,
+                ClientSecret = "secret",
+
+                ResponseType = "code",
+                ResponseMode = "query"
+            });
+
             app.UseTwitterAuthentication(
                consumerKey: "sadfsdfsfd",
                consumerSecret: "sdfsdfsdfsdf");
 
             app.UseFacebookAuthentication(
-               appId: "sdfdfsdf",
-               appSecret: "sfsfsdfsdf");
+               appId: "243282711119961",
+               appSecret: "aa17333f9f001bde85b1b3e2ac01e283");
 
             app.UseGoogleAuthentication(new GoogleOAuth2AuthenticationOptions()
             {
