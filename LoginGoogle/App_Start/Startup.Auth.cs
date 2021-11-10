@@ -71,8 +71,8 @@ namespace LoginGoogle
             });
 
             app.UseTwitterAuthentication(
-               consumerKey: "sadfsdfsfd",
-               consumerSecret: "sdfsdfsdfsdf");
+               consumerKey: "xvz1evFS4wEEPTGEFPHBog",
+               consumerSecret: "L8qq9PZyRg6ieKGEKhZolGC0vJWLw8iEJ88DRdyOg");
 
             app.UseFacebookAuthentication(
                appId: "243282711119961",
