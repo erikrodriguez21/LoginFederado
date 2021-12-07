@@ -17,6 +17,8 @@ namespace LoginGoogle.Models
         [Required]
         [Display(Name = "Apellido materno")] 
         public string ApellidoMaterno { get; set; }
+        public bool isApple { get; set; }
+        public string subApple { get; set; }
     }
 
     public class ExternalLoginListViewModel

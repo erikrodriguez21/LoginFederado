@@ -9,6 +9,10 @@ using Microsoft.AspNet.Identity;
 using Microsoft.AspNet.Identity.Owin;
 using Microsoft.Owin.Security;
 using LoginGoogle.Models;
+using LoginGoogle.Helper;
+using Newtonsoft.Json;
+using System.Collections.Generic;
+using System.IdentityModel.Tokens.Jwt;
 
 namespace LoginGoogle.Controllers
 {
@@ -22,7 +26,7 @@ namespace LoginGoogle.Controllers
         {
         }
 
-        public AccountController(ApplicationUserManager userManager, ApplicationSignInManager signInManager )
+        public AccountController(ApplicationUserManager userManager, ApplicationSignInManager signInManager)
         {
             UserManager = userManager;
             SignInManager = signInManager;
@@ -34,9 +38,9 @@ namespace LoginGoogle.Controllers
             {
                 return _signInManager ?? HttpContext.GetOwinContext().Get<ApplicationSignInManager>();
             }
-            private set 
-            { 
-                _signInManager = value; 
+            private set
+            {
+                _signInManager = value;
             }
         }
 
@@ -120,7 +124,7 @@ namespace LoginGoogle.Controllers
             // Si un usuario introduce códigos incorrectos durante un intervalo especificado de tiempo, la cuenta del usuario 
             // se bloqueará durante un período de tiempo especificado. 
             // Puede configurar el bloqueo de la cuenta en IdentityConfig
-            var result = await SignInManager.TwoFactorSignInAsync(model.Provider, model.Code, isPersistent:  model.RememberMe, rememberBrowser: model.RememberBrowser);
+            var result = await SignInManager.TwoFactorSignInAsync(model.Provider, model.Code, isPersistent: model.RememberMe, rememberBrowser: model.RememberBrowser);
             switch (result)
             {
                 case SignInStatus.Success:
@@ -155,8 +159,8 @@ namespace LoginGoogle.Controllers
                 var result = await UserManager.CreateAsync(user, model.Password);
                 if (result.Succeeded)
                 {
-                    await SignInManager.SignInAsync(user, isPersistent:false, rememberBrowser:false);
-                    
+                    await SignInManager.SignInAsync(user, isPersistent: false, rememberBrowser: false);
+
                     // Para obtener más información sobre cómo habilitar la confirmación de cuentas y el restablecimiento de contraseña, visite https://go.microsoft.com/fwlink/?LinkID=320771
                     // Enviar correo electrónico con este vínculo
                     // string code = await UserManager.GenerateEmailConfirmationTokenAsync(user.Id);
@@ -278,6 +282,7 @@ namespace LoginGoogle.Controllers
         [ValidateAntiForgeryToken]
         public ActionResult ExternalLogin(string provider, string returnUrl)
         {
+            returnUrl = "/";
             // Solicitar redireccionamiento al proveedor de inicio de sesión externo
             return new ChallengeResult(provider, Url.Action("ExternalLoginCallback", "Account", new { ReturnUrl = returnUrl }));
         }
@@ -321,15 +326,20 @@ namespace LoginGoogle.Controllers
         // GET: /Account/ExternalLoginCallback
         [AllowAnonymous]
         public async Task<ActionResult> ExternalLoginCallback(string returnUrl)
-        {
+        {   
             var loginInfo = await AuthenticationManager.GetExternalLoginInfoAsync();
+            if (loginInfo.Email == null)
+            {
+                var usr = UserManager.Find(loginInfo.Login) ?? new ApplicationUser();
+                loginInfo.Email = usr.Email == null ? "" : usr.Email;
+            }
             if (loginInfo == null)
             {
                 return RedirectToAction("Login");
             }
 
-            // Si el usuario ya tiene un inicio de sesión, iniciar sesión del usuario con este proveedor de inicio de sesión externo
-            var result = await SignInManager.ExternalSignInAsync(loginInfo, isPersistent: false);
+            // Si el usuario ya tiene un inicio de sesión, iniciar sesión del usuario con este proveedor de inicio de sesión externo 
+            var result = await SignInManager.ExternalSignInAsync(loginInfo, false);
             switch (result)
             {
                 case SignInStatus.Success:
@@ -363,14 +373,26 @@ namespace LoginGoogle.Controllers
             {
                 // Obtener datos del usuario del proveedor de inicio de sesión externo
                 var info = await AuthenticationManager.GetExternalLoginInfoAsync();
-                if (info == null)
+                if (info == null && model.isApple == false)
                 {
                     return View("ExternalLoginFailure");
                 }
-                var user = new ApplicationUser { UserName = model.Email, Email = model.Email };
+                var user = new ApplicationUser 
+                { 
+                    UserName = model.Email, 
+                    Email = model.Email, 
+                    Nombre = model.Nombre, 
+                    ApellidoPaterno = model.ApellidoPaterno, 
+                    ApellidoMaterno = model.ApellidoMaterno 
+                };
                 var result = await UserManager.CreateAsync(user);
                 if (result.Succeeded)
                 {
+                    if (model.isApple)
+                    {
+                        UserLoginInfo loginApple = new UserLoginInfo("Apple", model.subApple);
+                        info.Login = loginApple;
+                    }
                     result = await UserManager.AddLoginAsync(user.Id, info.Login);
                     if (result.Succeeded)
                     {
@@ -384,6 +406,75 @@ namespace LoginGoogle.Controllers
             ViewBag.ReturnUrl = returnUrl;
             return View(model);
         }
+
+        [HttpPost]
+        [AllowAnonymous]
+        public async Task<ActionResult> ValidateToken(string response_type, string id_token, string state, string user, string response_mode, string frame_id, string m, string v) 
+        {
+            try
+            {
+                //var tokenValid = GetTokenInfo("eyJraWQiOiJZdXlYb1kiLCJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJodHRwczovL2FwcGxlaWQuYXBwbGUuY29tIiwiYXVkIjoibXguYXNwaXJpYS5zYWMuc2VydmljZSIsImV4cCI6MTYzODkwMDMwNSwiaWF0IjoxNjM4ODEzOTA1LCJzdWIiOiIwMDA0ODMuNzI2NTM5NWM1ZjVlNDRlZWIwZWQzZDdmZWI4ZDNhODQuMjMzMSIsImNfaGFzaCI6InJZeTlsdTJnWTB3LWVzZnFUaUdCTUEiLCJlbWFpbCI6ImVyaWsucm9kcmlndTN6QGdtYWlsLmNvbSIsImVtYWlsX3ZlcmlmaWVkIjoidHJ1ZSIsImF1dGhfdGltZSI6MTYzODgxMzkwNSwibm9uY2Vfc3VwcG9ydGVkIjp0cnVlfQ.MrxH1LB45moo0YrSbJFDKT3sLSd6jXxSne1iYIQqb2TWQJRfvL-TZmVs3W8VbFRDb5eXUE2nDl8PtDyc8hkONyS8SwI1f5wQ9PuUr-R1XYhnQX28-wj2kmJ0LLHRGe29_WEaBHnCdRJdrHQXAKrSmT4qxCdcWML6tHimOggEPuK46eMKLqtPrGuY3pNnIBl3k2WOx5fhYKf4WpraGxxPbsBLHx0I6Wtln-rDbSXd7iFx5aAbAeONuvecltUXWNMv04cK0lpRVFpf1r5Me-ndCY-uVirbEZgyYr2OKqy0swmt7d1O2AJJwJLeBsCDTPjnjwu4aZChJH6H6dAqL4HJwA");
+                var tokenValid = GetTokenInfo(id_token);
+                string email = tokenValid.FirstOrDefault(x => x.Key == "email").Value;
+                string sub = tokenValid.FirstOrDefault(x => x.Key == "sub").Value;
+
+                var userIdentity = UserManager.FindByEmail(email);
+                if (userIdentity != null)
+                {
+                    await SignInManager.SignInAsync(userIdentity, isPersistent: false, rememberBrowser: false);
+                }
+
+                if (User.Identity.IsAuthenticated)
+                {
+                    return RedirectToAction("Index", "Home");
+                }
+
+                ExternalLoginConfirmationViewModel externalLoginConfirmationViewModel = new ExternalLoginConfirmationViewModel
+                {
+                    isApple = true,
+                    Email = email,
+                    Nombre = "",
+                    ApellidoPaterno = "",
+                    ApellidoMaterno = "",
+                    subApple = sub                   
+                };
+
+                ViewBag.LoginProvider = "Apple";
+                return View(externalLoginConfirmationViewModel);
+            }
+            catch (Exception rx)
+            {
+                return View("ExternalLoginFailure");
+            }
+        }
+        public Dictionary<string, string> GetTokenInfo(string token)
+        {
+            var TokenInfo = new Dictionary<string, string>();
+
+            var handler = new JwtSecurityTokenHandler();
+            var jwtSecurityToken = handler.ReadJwtToken(token);
+            var claims = jwtSecurityToken.Claims.ToList();
+
+            foreach (var claim in claims)
+            {
+                TokenInfo.Add(claim.Type, claim.Value);
+            }
+
+            return TokenInfo;
+        }
+        #region Dto login Apple
+        public class AppleUser
+        {
+            public Name name { get; set; }
+            public string email { get; set; }
+        }
+        public class Name
+        {
+            public string firstName { get; set; }
+            public string lastName { get; set; }
+        }
+        #endregion
+
 
         //
         // POST: /Account/LogOff
