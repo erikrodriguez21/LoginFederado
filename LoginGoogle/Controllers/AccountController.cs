@@ -61,6 +61,9 @@ namespace LoginGoogle.Controllers
         [AllowAnonymous]
         public ActionResult Login(string returnUrl)
         {
+            PermisosDto per = new PermisosDto { IdModulo = 1, IdPermiso = 1, Nombre = "Ventas" };
+            var list = new List<PermisosDto>();
+            Session["Permisos"] = list;
             ViewBag.ReturnUrl = returnUrl;
             return View();
         }
@@ -326,34 +329,38 @@ namespace LoginGoogle.Controllers
         // GET: /Account/ExternalLoginCallback
         [AllowAnonymous]
         public async Task<ActionResult> ExternalLoginCallback(string returnUrl)
-        {   
-            var loginInfo = await AuthenticationManager.GetExternalLoginInfoAsync();
-            if (loginInfo.Email == null)
+        {
+            try
             {
-                var usr = UserManager.Find(loginInfo.Login) ?? new ApplicationUser();
-                loginInfo.Email = usr.Email == null ? "" : usr.Email;
-            }
-            if (loginInfo == null)
-            {
-                return RedirectToAction("Login");
-            }
+                var loginInfo = await AuthenticationManager.GetExternalLoginInfoAsync();               
+                if (loginInfo == null)
+                {
+                    return RedirectToAction("Login");
+                }
 
-            // Si el usuario ya tiene un inicio de sesión, iniciar sesión del usuario con este proveedor de inicio de sesión externo 
-            var result = await SignInManager.ExternalSignInAsync(loginInfo, false);
-            switch (result)
+                // Si el usuario ya tiene un inicio de sesión, iniciar sesión del usuario con este proveedor de inicio de sesión externo 
+                var result = await SignInManager.ExternalSignInAsync(loginInfo, false);
+                switch (result)
+                {
+                    case SignInStatus.Success:
+                        return RedirectToLocal(returnUrl);
+                    case SignInStatus.LockedOut:
+                        return View("Lockout");
+                    case SignInStatus.RequiresVerification:
+                        return RedirectToAction("SendCode", new { ReturnUrl = returnUrl, RememberMe = false });
+                    case SignInStatus.Failure:
+                    default:
+                        // Si el usuario no tiene ninguna cuenta, solicitar que cree una
+                        ViewBag.ReturnUrl = returnUrl;
+                        ViewBag.LoginProvider = loginInfo.Login.LoginProvider;
+                        return View("ExternalLoginConfirmation", new ExternalLoginConfirmationViewModel { Email = loginInfo.Email });
+                }
+            }
+            catch (Exception ex)
             {
-                case SignInStatus.Success:
-                    return RedirectToLocal(returnUrl);
-                case SignInStatus.LockedOut:
-                    return View("Lockout");
-                case SignInStatus.RequiresVerification:
-                    return RedirectToAction("SendCode", new { ReturnUrl = returnUrl, RememberMe = false });
-                case SignInStatus.Failure:
-                default:
-                    // Si el usuario no tiene ninguna cuenta, solicitar que cree una
-                    ViewBag.ReturnUrl = returnUrl;
-                    ViewBag.LoginProvider = loginInfo.Login.LoginProvider;
-                    return View("ExternalLoginConfirmation", new ExternalLoginConfirmationViewModel { Email = loginInfo.Email });
+                ExternalLoginConfirmationViewModel exError = new ExternalLoginConfirmationViewModel();
+                exError.ExternalError = ex.Message;
+                return View("ExternalLoginFailure", exError);               
             }
         }
 
@@ -364,68 +371,69 @@ namespace LoginGoogle.Controllers
         [ValidateAntiForgeryToken]
         public async Task<ActionResult> ExternalLoginConfirmation(ExternalLoginConfirmationViewModel model, string returnUrl)
         {
-            if (User.Identity.IsAuthenticated)
+            try
             {
-                return RedirectToAction("Index", "Manage");
-            }
-
-            if (ModelState.IsValid)
-            {
-                // Obtener datos del usuario del proveedor de inicio de sesión externo
-                var info = await AuthenticationManager.GetExternalLoginInfoAsync();
-                if (info == null && model.isApple == false)
+                if (User.Identity.IsAuthenticated)
                 {
-                    return View("ExternalLoginFailure");
+                    return RedirectToAction("Index", "Manage");
                 }
-                var user = new ApplicationUser 
-                { 
-                    UserName = model.Email, 
-                    Email = model.Email, 
-                    Nombre = model.Nombre, 
-                    ApellidoPaterno = model.ApellidoPaterno, 
-                    ApellidoMaterno = model.ApellidoMaterno 
-                };
-                var result = await UserManager.CreateAsync(user);
-                if (result.Succeeded)
+
+                if (ModelState.IsValid)
                 {
-                    if (model.isApple)
+                    // Obtener datos del usuario del proveedor de inicio de sesión externo
+                    var info = await AuthenticationManager.GetExternalLoginInfoAsync();
+                    if (info == null)
                     {
-                        UserLoginInfo loginApple = new UserLoginInfo("Apple", model.subApple);
-                        info.Login = loginApple;
+                        return View("ExternalLoginFailure");
                     }
-                    result = await UserManager.AddLoginAsync(user.Id, info.Login);
+                    var user = new ApplicationUser
+                    {
+                        UserName = model.Email,
+                        Email = model.Email,
+                        Nombre = model.Nombre,
+                        ApellidoPaterno = model.ApellidoPaterno,
+                        ApellidoMaterno = model.ApellidoMaterno
+                    };
+                    var result = await UserManager.CreateAsync(user);
                     if (result.Succeeded)
-                    {
-                        await SignInManager.SignInAsync(user, isPersistent: false, rememberBrowser: false);
-                        return RedirectToLocal(returnUrl);
+                    {  
+                        result = await UserManager.AddLoginAsync(user.Id, info.Login);
+                        if (result.Succeeded)
+                        {
+                            await SignInManager.SignInAsync(user, isPersistent: false, rememberBrowser: false);
+                            return RedirectToLocal(returnUrl);
+                        }
                     }
+                    AddErrors(result);
                 }
-                AddErrors(result);
-            }
 
-            ViewBag.ReturnUrl = returnUrl;
-            return View(model);
+                ViewBag.ReturnUrl = returnUrl;
+                return View(model);
+            }
+            catch (Exception ex)
+            {
+                ExternalLoginConfirmationViewModel exError = new ExternalLoginConfirmationViewModel();
+                exError.ExternalError = ex.Message;
+                return View("ExternalLoginFailure", exError);
+            }
         }
 
         [HttpPost]
-        [AllowAnonymous]
+        [AllowAnonymous]        
         public async Task<ActionResult> ValidateToken(string response_type, string id_token, string state, string user, string response_mode, string frame_id, string m, string v) 
         {
             try
             {
                 //var tokenValid = GetTokenInfo("eyJraWQiOiJZdXlYb1kiLCJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJodHRwczovL2FwcGxlaWQuYXBwbGUuY29tIiwiYXVkIjoibXguYXNwaXJpYS5zYWMuc2VydmljZSIsImV4cCI6MTYzODkwMDMwNSwiaWF0IjoxNjM4ODEzOTA1LCJzdWIiOiIwMDA0ODMuNzI2NTM5NWM1ZjVlNDRlZWIwZWQzZDdmZWI4ZDNhODQuMjMzMSIsImNfaGFzaCI6InJZeTlsdTJnWTB3LWVzZnFUaUdCTUEiLCJlbWFpbCI6ImVyaWsucm9kcmlndTN6QGdtYWlsLmNvbSIsImVtYWlsX3ZlcmlmaWVkIjoidHJ1ZSIsImF1dGhfdGltZSI6MTYzODgxMzkwNSwibm9uY2Vfc3VwcG9ydGVkIjp0cnVlfQ.MrxH1LB45moo0YrSbJFDKT3sLSd6jXxSne1iYIQqb2TWQJRfvL-TZmVs3W8VbFRDb5eXUE2nDl8PtDyc8hkONyS8SwI1f5wQ9PuUr-R1XYhnQX28-wj2kmJ0LLHRGe29_WEaBHnCdRJdrHQXAKrSmT4qxCdcWML6tHimOggEPuK46eMKLqtPrGuY3pNnIBl3k2WOx5fhYKf4WpraGxxPbsBLHx0I6Wtln-rDbSXd7iFx5aAbAeONuvecltUXWNMv04cK0lpRVFpf1r5Me-ndCY-uVirbEZgyYr2OKqy0swmt7d1O2AJJwJLeBsCDTPjnjwu4aZChJH6H6dAqL4HJwA");
                 var tokenValid = GetTokenInfo(id_token);
+                ViewBag.Token = tokenValid;
                 string email = tokenValid.FirstOrDefault(x => x.Key == "email").Value;
                 string sub = tokenValid.FirstOrDefault(x => x.Key == "sub").Value;
 
                 var userIdentity = UserManager.FindByEmail(email);
-                if (userIdentity != null)
+                if (userIdentity != null || User.Identity.IsAuthenticated)
                 {
                     await SignInManager.SignInAsync(userIdentity, isPersistent: false, rememberBrowser: false);
-                }
-
-                if (User.Identity.IsAuthenticated)
-                {
                     return RedirectToAction("Index", "Home");
                 }
 
@@ -442,9 +450,56 @@ namespace LoginGoogle.Controllers
                 ViewBag.LoginProvider = "Apple";
                 return View(externalLoginConfirmationViewModel);
             }
-            catch (Exception rx)
+            catch (Exception ex)
             {
-                return View("ExternalLoginFailure");
+                ExternalLoginConfirmationViewModel exError = new ExternalLoginConfirmationViewModel();
+                exError.ExternalError = ex.Message;
+                return View("ExternalLoginFailure", exError);
+            }
+        }
+
+        [AllowAnonymous]
+        [HttpPost]
+        public async Task<ActionResult> LoginAppleConfirmation(ExternalLoginConfirmationViewModel model, string returnUrl) 
+        {
+            try
+            {               
+                var user = new ApplicationUser
+                {
+                    UserName = model.Email,
+                    Email = model.Email,
+                    Nombre = model.Nombre,
+                    ApellidoPaterno = model.ApellidoPaterno,
+                    ApellidoMaterno = model.ApellidoMaterno
+                };
+
+                var result = await UserManager.CreateAsync(user);
+                if (result.Succeeded)
+                {
+                    ExternalLoginInfo externalLoginInfo = new ExternalLoginInfo();
+                    UserLoginInfo loginApple = new UserLoginInfo("Apple", model.subApple);                        
+                    externalLoginInfo.Email = model.Email;
+                    externalLoginInfo.Login = loginApple;
+                    //guarda el login en SysUserLogins
+                    result = await UserManager.AddLoginAsync(user.Id, externalLoginInfo.Login);
+                    if (result.Succeeded)
+                    {
+                        await SignInManager.SignInAsync(user, isPersistent: false, rememberBrowser: false);
+                        return RedirectToLocal(returnUrl);
+                    }
+                }
+                AddErrors(result);                
+
+                ViewBag.ReturnUrl = returnUrl;
+                ExternalLoginConfirmationViewModel exError = new ExternalLoginConfirmationViewModel();
+                exError.ExternalError = "";
+                return View("ExternalLoginFailure", exError);
+            }
+            catch (Exception ex)
+            {
+                ExternalLoginConfirmationViewModel exError = new ExternalLoginConfirmationViewModel();
+                exError.ExternalError = ex.Message;
+                return View("ExternalLoginFailure", exError);
             }
         }
         public Dictionary<string, string> GetTokenInfo(string token)

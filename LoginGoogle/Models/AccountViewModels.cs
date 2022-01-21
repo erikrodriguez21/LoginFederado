@@ -19,6 +19,7 @@ namespace LoginGoogle.Models
         public string ApellidoMaterno { get; set; }
         public bool isApple { get; set; }
         public string subApple { get; set; }
+        public string ExternalError { get; set; } 
     }
 
     public class ExternalLoginListViewModel

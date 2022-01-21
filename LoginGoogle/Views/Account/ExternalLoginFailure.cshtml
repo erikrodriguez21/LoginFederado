@@ -1,4 +1,5 @@
-﻿@{
+﻿@model LoginGoogle.Models.ExternalLoginConfirmationViewModel
+@{
     ViewBag.Title = "Error de inicio de sesión";
 }
 
@@ -6,3 +7,5 @@
     <h2>@ViewBag.Title.</h2>
     <h3 class="text-danger">El inicio de sesión con el servicio no se ha llevado a cabo correctamente.</h3>
 </hgroup>
+<hr />
+<h3>@Model.ExternalError</h3>
