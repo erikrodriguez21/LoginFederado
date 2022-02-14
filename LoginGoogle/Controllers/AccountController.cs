@@ -61,9 +61,6 @@ namespace LoginGoogle.Controllers
         [AllowAnonymous]
         public ActionResult Login(string returnUrl)
         {
-            PermisosDto per = new PermisosDto { IdModulo = 1, IdPermiso = 1, Nombre = "Ventas" };
-            var list = new List<PermisosDto>();
-            Session["Permisos"] = list;
             ViewBag.ReturnUrl = returnUrl;
             return View();
         }
@@ -86,6 +83,19 @@ namespace LoginGoogle.Controllers
             switch (result)
             {
                 case SignInStatus.Success:
+                    PermisosDto per = new PermisosDto { IdModulo = 200, IdPermiso = 200, Nombre = "Ventas" };
+                    var list = new List<PermisosDto>();
+                    list.Add(per);
+                    Session["Permisos"] = list;
+
+                    foreach (var item in System.Web.HttpContext.Current.Session["Permisos"] as List<PermisosDto>)
+                    {
+                        if (item.IdPermiso == 100)
+                        {
+                            var res = ";";
+                        };
+                    }
+
                     return RedirectToLocal(returnUrl);
                 case SignInStatus.LockedOut:
                     return View("Lockout");

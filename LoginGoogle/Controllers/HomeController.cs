@@ -8,7 +8,7 @@ namespace LoginGoogle.Controllers
         public string email = "";
         
         
-        [Permisos(PermisosModulo.Ventas.VerClientes, Roles ="Admin")]
+        [Permisos(PermisosModulo.Ventas.VerClientes, Roles = "Admin,Cliente")]
         public ActionResult Index()
         {   
             return View();

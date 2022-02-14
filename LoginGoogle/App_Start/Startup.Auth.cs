@@ -6,8 +6,8 @@ using Microsoft.Owin.Security.Cookies;
 using Microsoft.Owin.Security.Google;
 using Owin;
 using LoginGoogle.Models;
-using Microsoft.Owin.Security.OpenIdConnect;
 using System.Configuration;
+using Microsoft.AspNet.Identity.EntityFramework;
 
 namespace LoginGoogle
 {
@@ -16,9 +16,34 @@ namespace LoginGoogle
         // Para obtener más información sobre cómo configurar la autenticación, visite https://go.microsoft.com/fwlink/?LinkId=301864
         public void ConfigureAuth(IAppBuilder app)
         {
+            //role manager
+            var roleManager = new RoleManager<IdentityRole>(new RoleStore<IdentityRole>(new ApplicationDbContext()));
+            if (!roleManager.RoleExists("Cliente"))
+            {
+                var role = new IdentityRole();
+                role.Name = "Cliente";
+                roleManager.Create(role);
+                //
+                var role2 = new IdentityRole();
+                role2.Name = "Usuario";
+                roleManager.Create(role2);
+                //
+                var role3 = new IdentityRole();
+                role3.Name = "Manager";
+                roleManager.Create(role3);
+                //
+                var role4 = new IdentityRole();
+                role4.Name = "Admin";
+                roleManager.Create(role4); 
+                //
+                var role5 = new IdentityRole();
+                role5.Name = "SuperAdmin";
+                roleManager.Create(role5);
+
+            }
             // Configure el contexto de base de datos, el administrador de usuarios y el administrador de inicios de sesión para usar una única instancia por solicitud
             app.CreatePerOwinContext(ApplicationDbContext.Create);
-            app.CreatePerOwinContext<ApplicationUserManager>(ApplicationUserManager.Create);
+            app.CreatePerOwinContext<ApplicationUserManager>(ApplicationUserManager.Create);            
             app.CreatePerOwinContext<ApplicationSignInManager>(ApplicationSignInManager.Create);
 
             // Permitir que la aplicación use una cookie para almacenar información para el usuario que inicia sesión

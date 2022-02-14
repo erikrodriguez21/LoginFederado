@@ -34,5 +34,14 @@ namespace LoginGoogle.Models
         {
             return new ApplicationDbContext();
         }
+
+        //DbSet
+        public DbSet<Modulos> Modulos { get; set; }
+        public DbSet<Permisos> Permisos { get; set; }        
+        public DbSet<PermisosRole> PermisosRole { get; set; } 
+        public DbSet<UsuarioModulos> UsuarioModulos { get; set; }
+
+
+
     }
 }
